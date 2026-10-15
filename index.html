@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>NEIL STUDIO — Architectural Media Tool</title>
+
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       CINEMATIC DESIGN TOKENS (NEIL STUDIO OBSIDIAN AESTHETIC)
+       ========================================================================== */
+    :root {
+      --bg: #090a0f;
+      --surface: #11141c;
+      --surface-subtle: #181d28;
+      --surface-hover: #1e2433;
+      --accent-emerald: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.25);
+      --text-main: #f5f6f8;
+      --text-muted: #828a99;
+      --text-dim: #444c5c;
+      --border-thin: rgba(255, 255, 255, 0.07);
+      --border-focus: rgba(255, 255, 255, 0.22);
+      
+      --ease-cinema: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --duration-morph: 0.9s;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: 'Geist', -apple-system, sans-serif;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Ambient Depth Glow */
+    .viewport-canvas {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 1200px;
+    }
+
+    .ambient-radial {
+      position: absolute;
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.06) 0%, rgba(9, 10, 15, 0) 70%);
+      filter: blur(100px);
+      pointer-events: none;
+      transition: transform 1.2s var(--ease-cinema);
+    }
+
+    /* ==========================================================================
+       HEADER & PORTAL TRACKER
+       ========================================================================== */
+    .studio-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 72px;
+      padding: 0 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 50;
+      border-bottom: 1px solid var(--border-thin);
+      backdrop-filter: blur(20px);
+      background: rgba(9, 10, 15, 0.65);
+    }
+
+    .studio-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+      text-decoration: none;
+    }
+
+    .brand-pill {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border-thin);
+      border-radius: 4px;
+      color: var(--accent-emerald);
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .header-btn {
+      background: transparent;
+      border: 1px solid var(--border-thin);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .header-btn:hover {
+      border-color: var(--border-focus);
+      color: var(--text-main);
+    }
+
+    /* Fixed Scene Stage Counter: 01 / 06 */
+    .stage-indicator {
+      position: fixed;
+      bottom: 32px;
+      right: 40px;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+    }
+
+    .stage-numbers {
+      font-size: 0.85rem;
+      color: var(--text-main);
+      font-weight: 700;
+    }
+
+    .stage-line {
+      width: 48px;
+      height: 1px;
+      background: var(--border-thin);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stage-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 16.66%;
+      background: var(--accent-emerald);
+      transition: width 0.8s var(--ease-cinema);
+    }
+
+    /* ==========================================================================
+       SCENE 01: INTRO (LARGE HERO TYPOGRAPHY)
+       ========================================================================== */
+    .scene-intro {
+      position: absolute;
+      text-align: center;
+      max-width: 900px;
+      width: 90%;
+      transition: all var(--duration-morph) var(--ease-cinema);
+      z-index: 2;
+    }
+
+    .intro-headline {
+      font-size: clamp(3rem, 8.5vw, 6.8rem);
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      line-height: 0.95;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+      transform-origin: center center;
+      transition: transform var(--duration-morph) var(--ease-cinema), opacity var(--duration-morph) var(--ease-cinema);
+    }
+
+    .intro-sub {
+      font-size: clamp(0.95rem, 1.8vw, 1.25rem);
+      color: var(--text-muted);
+      max-width: 500px;
+      margin: 0 auto 36px;
+      letter-spacing: -0.01em;
+      transition: opacity 0.5s ease;
+    }
+
+    .scroll-cue {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 10px 20px;
+      border: 1px solid var(--border-thin);
+      border-radius: 100px;
+      transition: all 0.3s ease;
+    }
+
+    .scroll-cue:hover {
+      border-color: var(--text-muted);
+      color: var(--text-main);
+      transform: translateY(2px);
+    }
+
+    /* ==========================================================================
+       THE CHAMELEON STAGE (MORPHS INPUT → PREVIEW → FORMAT → ENGINE)
+       ========================================================================== */
+    .morph-hub {
+      position: absolute;
+      width: 90%;
+      max-width: 680px;
+      min-height: 64px;
+      background: var(--surface);
+      border: 1px solid var(--border-thin);
+      border-radius: 20px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+      transition: all var(--duration-morph) var(--ease-cinema);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: translateY(120px) scale(0.9);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ---------------- STAGE 02: INPUT STATE ---------------- */
+    body[data-stage="input"] .scene-intro {
+      transform: translateY(-140px) scale(0.85);
+      opacity: 0.15;
+    }
+
+    body[data-stage="input"] .morph-hub {
+      transform: translateY(40px) scale(1);
+      opacity: 1;
+      pointer-events: all;
+      max-width: 700px;
+      min-height: 68px;
+    }
+
+    .input-bar {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px 10px 22px;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .input-core {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 1.05rem;
+    }
+
+    .input-core::placeholder {
+      color: var(--text-dim);
+    }
+
+    .btn-paste {
+      background: var(--surface-subtle);
+      border: 1px solid var(--border-thin);
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      letter-spacing: 0.08em;
+      transition: all 0.2s ease;
+    }
+
+    .btn-paste:hover {
+      color: var(--text-main);
+      background: var(--surface-hover);
+    }
+
+    .btn-morph-submit {
+      background: var(--text-main);
+      color: var(--bg);
+      border: none;
+      padding: 14px 26px;
+      border-radius: 12px;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.2s var(--ease-elastic), background-color 0.3s;
+    }
+
+    .btn-morph-submit:hover {
+      transform: scale(1.03);
+    }
+
+    /* ---------------- STAGE 03: PREVIEW & FORMAT SPLIT ---------------- */
+    body[data-stage="preview"] .scene-intro,
+    body[data-stage="format"] .scene-intro,
+    body[data-stage="download"] .scene-intro,
+    body[data-stage="success"] .scene-intro {
+      transform: translateY(-260px) scale(0.7);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    body[data-stage="preview"] .morph-hub,
+    body[data-stage="format"] .morph-hub {
+      transform: translateY(20px) scale(1);
+      opacity: 1;
+      pointer-events: all;
+      max-width: 1060px;
+      border-radius: 28px;
+    }
+
+    /* Expanded Content Container */
+    .studio-console {
+      display: none;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s var(--ease-cinema), transform 0.6s var(--ease-cinema);
+      width: 100%;
+    }
+
+    body[data-stage="preview"] .studio-console,
+    body[data-stage="format"] .studio-console,
+    body[data-stage="download"] .studio-console,
+    body[data-stage="success"] .studio-console {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Left Console Wing (Video Artwork & Meta) */
+    .wing-preview {
+      padding: 36px;
+      border-right: 1px solid var(--border-thin);
+      background: #0d0f16;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .media-frame {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border-thin);
+      margin-bottom: 20px;
+    }
+
+    .media-thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.04);
+      transition: transform 1.2s var(--ease-cinema);
+    }
+
+    .media-duration {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+      color: #fff;
+      font-size: 0.72rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .media-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      line-height: 1.35;
+      letter-spacing: -0.02em;
+      margin-bottom: 10px;
+    }
+
+    .media-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Right Console Wing (Category Deck & Morph Actions) */
+    .wing-controls {
+      padding: 36px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: var(--surface);
+    }
+
+    .category-tabs {
+      display: flex;
+      gap: 6px;
+      background: var(--surface-subtle);
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+    }
+
+    .cat-tab {
+      flex: 1;
+      padding: 9px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+
+    .cat-tab.active {
+      background: var(--surface-hover);
+      color: var(--text-main);
+    }
+
+    /* Format Deck Cards */
+    .deck-content {
+      display: none;
+    }
+    .deck-content.active {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .deck-card {
+      background: var(--surface-subtle);
+      border: 1px solid var(--border-thin);
+      border-radius: 12px;
+      padding: 14px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: all 0.3s var(--ease-cinema);
+    }
+
+    .deck-card:hover {
+      border-color: var(--border-focus);
+      transform: translateY(-2px);
+    }
+
+    .deck-card.selected {
+      border-color: var(--accent-emerald);
+      background: rgba(16, 185, 129, 0.08);
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-name {
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .card-codec {
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .card-meta {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    /* ---------------- STAGE 05: DOWNLOAD MORPH CHAMBER ---------------- */
+    .action-chamber {
+      position: relative;
+      width: 100%;
+      height: 60px;
+      border-radius: 14px;
+      background: var(--text-main);
+      color: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      overflow: hidden;
+      transition: all 0.4s var(--ease-cinema);
+    }
+
+    .chamber-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 0%;
+      background: var(--accent-emerald);
+      transition: width 0.25s linear;
+      z-index: 1;
+    }
+
+    .chamber-content {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.3s ease;
+    }
+
+    body[data-stage="download"] .action-chamber {
+      background: var(--surface-subtle);
+      color: var(--text-main);
+      border: 1px solid var(--accent-emerald);
+      cursor: wait;
+    }
+
+    body[data-stage="success"] .action-chamber {
+      background: var(--accent-emerald);
+      color: #052416;
+      cursor: pointer;
+    }
+
+    /* Modals: Help & History */
+    .modal-sheet {
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 10, 15, 0.7);
+      backdrop-filter: blur(14px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .modal-sheet.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--border-thin);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 520px;
+      padding: 32px;
+      box-shadow: 0 40px 90px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Custom Cursor Experience (Desktop) */
+    .custom-cursor {
+      position: fixed;
+      width: 24px;
+      height: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      transition: transform 0.08s linear, width 0.3s, height 0.3s, border-color 0.3s;
+    }
+
+    .custom-cursor-dot {
+      position: fixed;
+      width: 4px;
+      height: 4px;
+      background: var(--accent-emerald);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 10000;
+      transform: translate(-50%, -50%);
+    }
+
+    /* ==========================================================================
+       MOBILE RESPONSIVENESS & TOUCH GESTURES
+       ========================================================================== */
+    @media (max-width: 860px) {
+      .studio-header {
+        padding: 0 20px;
+      }
+      .custom-cursor, .custom-cursor-dot {
+        display: none !important;
+      }
+      .morph-hub {
+        width: 92%;
+        max-height: 82vh;
+        overflow-y: auto;
+      }
+      body[data-stage="preview"] .studio-console,
+      body[data-stage="format"] .studio-console,
+      body[data-stage="download"] .studio-console,
+      body[data-stage="success"] .studio-console {
+        grid-template-columns: 1fr;
+      }
+      .wing-preview {
+        border-right: none;
+        border-bottom: 1px solid var(--border-thin);
+        padding: 22px;
+      }
+      .wing-controls {
+        padding: 22px;
+      }
+      .deck-content.active {
+        grid-template-columns: 1fr;
+      }
+      .stage-indicator {
+        bottom: 20px;
+        right: 20px;
+      }
+    }
+  </style>
+</head>
+<body data-stage="intro">
+
+  <!-- Magnetic Cursor (Desktop) -->
+  <div class="custom-cursor" id="cursorRing"></div>
+  <div class="custom-cursor-dot" id="cursorDot"></div>
+
+  <!-- Ambient Depth Background -->
+  <div class="ambient-radial" id="ambientRadial"></div>
+
+  <!-- Studio Header -->
+  <header class="studio-header">
+    <a href="#" class="studio-brand" id="brandReset">
+      NEIL STUDIO
+      <span class="brand-pill font-mono">v3.4</span>
+    </a>
+
+    <div class="header-controls">
+      <button class="header-btn font-mono" id="btnHelp">Help Desk</button>
+      <button class="header-btn font-mono" id="btnHistory">History</button>
+    </div>
+  </header>
+
+  <!-- Viewport Stage Canvas -->
+  <div class="viewport-canvas">
+
+    <!-- SCENE 01: INTRO -->
+    <div class="scene-intro" id="sceneIntro">
+      <h1 class="intro-headline">DOWNLOAD DIFFERENT.</h1>
+      <p class="intro-sub">
+        The architectural YouTube media tool. Engineered with cinematic transforms and zero unnecessary friction.
+      </p>
+      <div class="scroll-cue font-mono" id="cueScroll">
+        <span>Scroll or Tap to Enter</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <polyline points="19 12 12 19 5 12"></polyline>
+        </svg>
+      </div>
+    </div>
+
+    <!-- THE CHAMELEON MORPH HUB -->
+    <div class="morph-hub" id="morphHub">
+      
+      <!-- INPUT BAR (STAGE 02) -->
+      <div class="input-bar" id="inputBar">
+        <input 
+          type="text" 
+          id="urlInput"
+          class="input-core" 
+          placeholder="Paste YouTube or Shorts URL..."
+          autocomplete="off"
+        />
+        <button class="btn-paste font-mono" id="btnPaste">Paste</button>
+        <button class="btn-morph-submit" id="btnInspect">
+          <span id="inspectLabel">Inspect</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </button>
+      </div>
+
+      <!-- SPLIT CONSOLE (STAGE 03 / 04 / 05) -->
+      <div class="studio-console" id="studioConsole">
+        
+        <!-- Left Wing: Video Entity -->
+        <div class="wing-preview">
+          <div>
+            <div class="media-frame">
+              <img id="metaThumb" class="media-thumb" src="" alt="Thumbnail preview" />
+              <span id="metaDuration" class="media-duration font-mono">00:00</span>
+            </div>
+            <h2 id="metaTitle" class="media-title">Fetching Stream...</h2>
+          </div>
+
+          <div class="media-meta-row font-mono">
+            <span id="metaChannel" style="color: var(--text-main); font-weight: 600;">Channel</span>
+            <span>•</span>
+            <span id="metaViews">0 views</span>
+          </div>
+        </div>
+
+        <!-- Right Wing: Category Deck & Action Engine -->
+        <div class="wing-controls">
+          <div>
+            <!-- Category Tabs -->
+            <div class="category-tabs">
+              <button class="cat-tab active" data-deck="video">Video</button>
+              <button class="cat-tab" data-deck="audio">Audio</button>
+              <button class="cat-tab" data-deck="trim">Trimmer</button>
+              <button class="cat-tab" data-deck="subs">Transcript</button>
+            </div>
+
+            <!-- Video Deck -->
+            <div class="deck-content active" id="deck-video">
+              <div class="deck-card selected" data-mode="video" data-format="1080p">
+                <div class="card-top">
+                  <span class="card-name">1080p Full HD</span>
+                  <span class="card-codec font-mono">MP4</span>
+                </div>
+                <span class="card-meta font-mono">60 FPS Crisp</span>
+              </div>
+
+              <div class="deck-card" data-mode="video" data-format="4K">
+                <div class="card-top">
+                  <span class="card-name">4K Ultra HD</span>
+                  <span class="card-codec font-mono">MP4</span>
+                </div>
+                <span class="card-meta font-mono">Highest Native</span>
+              </div>
+
+              <div class="deck-card" data-mode="video" data-format="720p">
+                <div class="card-top">
+                  <span class="card-name">720p HD</span>
+                  <span class="card-codec font-mono">MP4</span>
+                </div>
+                <span class="card-meta font-mono">Fast Mobile</span>
+              </div>
+
+              <div class="deck-card" data-mode="video" data-format="480p">
+                <div class="card-top">
+                  <span class="card-name">480p SD</span>
+                  <span class="card-codec font-mono">MP4</span>
+                </div>
+                <span class="card-meta font-mono">Lightweight</span>
+              </div>
+            </div>
+
+            <!-- Audio Deck -->
+            <div class="deck-content" id="deck-audio">
+              <div class="deck-card" data-mode="audio" data-format="mp3">
+                <div class="card-top">
+                  <span class="card-name">320kbps MP3</span>
+                  <span class="card-codec font-mono">HQ</span>
+                </div>
+                <span class="card-meta font-mono">Universal Master</span>
+              </div>
+
+              <div class="deck-card" data-mode="audio" data-format="wav">
+                <div class="card-top">
+                  <span class="card-name">WAV Lossless</span>
+                  <span class="card-codec font-mono">PCM</span>
+                </div>
+                <span class="card-meta font-mono">Uncompressed</span>
+              </div>
+
+              <div class="deck-card" data-mode="audio" data-format="flac">
+                <div class="card-top">
+                  <span class="card-name">FLAC Studio</span>
+                  <span class="card-codec font-mono">Pro</span>
+                </div>
+                <span class="card-meta font-mono">Bit-Perfect</span>
+              </div>
+
+              <div class="deck-card" data-mode="audio" data-format="m4a">
+                <div class="card-top">
+                  <span class="card-name">M4A AAC</span>
+                  <span class="card-codec font-mono">Apple</span>
+                </div>
+                <span class="card-meta font-mono">iOS Native</span>
+              </div>
+            </div>
+
+            <!-- Trimmer Deck -->
+            <div class="deck-content" id="deck-trim" style="grid-template-columns: 1fr;">
+              <div style="background: var(--surface-subtle); padding: 14px; border-radius: 12px; border: 1px solid var(--border-thin);">
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Select start and end timecodes:</p>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="trimStart" class="input-core font-mono" value="00:00" style="background: var(--surface); padding: 8px; border-radius: 6px; text-align: center; border: 1px solid var(--border-thin);" />
+                  <span style="color: var(--text-dim); line-height: 2;">➔</span>
+                  <input type="text" id="trimEnd" class="input-core font-mono" value="01:00" style="background: var(--surface); padding: 8px; border-radius: 6px; text-align: center; border: 1px solid var(--border-thin);" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Subtitle Deck -->
+            <div class="deck-content" id="deck-subs">
+              <div class="deck-card" data-mode="subtitle" data-format="txt">
+                <div class="card-top">
+                  <span class="card-name">Clean Transcript</span>
+                  <span class="card-codec font-mono">TXT</span>
+                </div>
+                <span class="card-meta font-mono">AI-Ready Plain Text</span>
+              </div>
+
+              <div class="deck-card" data-mode="subtitle" data-format="srt">
+                <div class="card-top">
+                  <span class="card-name">Timed Subtitles</span>
+                  <span class="card-codec font-mono">SRT</span>
+                </div>
+                <span class="card-meta font-mono">Player Synced</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- STAGE 05/06: ACTION CHAMBER -->
+          <div class="action-chamber" id="actionChamber">
+            <div class="chamber-fill" id="chamberFill"></div>
+            <div class="chamber-content" id="chamberContent">
+              <span id="chamberLabel">Download 1080p MP4</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Stage Progress Counter (01 / 06) -->
+  <div class="stage-indicator font-mono">
+    <span class="stage-numbers" id="stageCounter">01 / 06</span>
+    <div class="stage-line">
+      <div class="stage-fill" id="stageFill"></div>
+    </div>
+    <span id="stageLabel">INTRO</span>
+  </div>
+
+  <!-- Help Desk Modal -->
+  <div class="modal-sheet" id="modalHelp">
+    <div class="modal-box">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="font-size: 1.15rem; font-weight: 700;">Neil Studio Help Desk</h3>
+        <button class="header-btn" id="btnCloseHelp">✕</button>
+      </div>
+      <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 14px;">
+        <strong>Clip Trimmer:</strong> Type any start/end minute (e.g., 01:20 to 02:40) to download only that excerpt.
+      </p>
+      <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 14px;">
+        <strong>Transcript (TXT):</strong> Extracts spoken dialogue with all timestamps stripped for direct AI prompts.
+      </p>
+      <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6;">
+        <strong>Storage:</strong> Downloads stream directly to your local default download folder.
+      </p>
+    </div>
+  </div>
+
+  <!-- History Drawer -->
+  <div class="modal-sheet" id="modalHistory">
+    <div class="modal-box">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="font-size: 1.15rem; font-weight: 700;">Recent Downloads</h3>
+        <button class="header-btn" id="btnCloseHistory">✕</button>
+      </div>
+      <div id="historyEntries" style="font-size: 0.85rem; color: var(--text-muted);">
+        No recent downloads in this session.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       CONTINUOUS INTERACTION & BACKEND SCRIPT
+       ========================================================================== */ -->
+  <script>
+    const API_BASE = window.location.origin.startsWith("http")
+      ? `${window.location.origin}/api`
+      : "http://127.0.0.1:5000/api";
+
+    // Global Pipeline State Machine
+    const STAGES = {
+      INTRO: { id: "intro", step: "01 / 06", pct: "16.66%" },
+      INPUT: { id: "input", step: "02 / 06", pct: "33.33%" },
+      PREVIEW: { id: "preview", step: "03 / 06", pct: "50.00%" },
+      FORMAT: { id: "format", step: "04 / 06", pct: "66.66%" },
+      DOWNLOAD: { id: "download", step: "05 / 06", pct: "83.33%" },
+      SUCCESS: { id: "success", step: "06 / 06", pct: "100.00%" }
+    };
+
+    let currentStage = STAGES.INTRO;
+    let selectedExport = { mode: 'video', format: '1080p', label: '1080p MP4' };
+    let compiledFileBlob = null;
+    let compiledFileName = "download.mp4";
+
+    // DOM Elements
+    const body = document.body;
+    const stageCounter = document.getElementById('stageCounter');
+    const stageFill = document.getElementById('stageFill');
+    const stageLabel = document.getElementById('stageLabel');
+    const ambientRadial = document.getElementById('ambientRadial');
+    const urlInput = document.getElementById('urlInput');
+    const btnPaste = document.getElementById('btnPaste');
+    const btnInspect = document.getElementById('btnInspect');
+    const inspectLabel = document.getElementById('inspectLabel');
+    const cueScroll = document.getElementById('cueScroll');
+    const brandReset = document.getElementById('brandReset');
+
+    const metaThumb = document.getElementById('metaThumb');
+    const metaTitle = document.getElementById('metaTitle');
+    const metaDuration = document.getElementById('metaDuration');
+    const metaChannel = document.getElementById('metaChannel');
+    const metaViews = document.getElementById('metaViews');
+
+    const actionChamber = document.getElementById('actionChamber');
+    const chamberFill = document.getElementById('chamberFill');
+    const chamberLabel = document.getElementById('chamberLabel');
+
+    function setStage(stage) {
+      currentStage = stage;
+      body.setAttribute('data-stage', stage.id);
+      stageCounter.textContent = stage.step;
+      stageFill.style.width = stage.pct;
+      stageLabel.textContent = stage.id.toUpperCase();
+    }
+
+    // 1. Scroll / Touch Gestures to Advance from Intro to Input
+    window.addEventListener('wheel', (e) => {
+      if (currentStage === STAGES.INTRO && e.deltaY > 20) {
+        setStage(STAGES.INPUT);
+        urlInput.focus();
+      }
+    });
+
+    cueScroll.addEventListener('click', () => {
+      setStage(STAGES.INPUT);
+      urlInput.focus();
+    });
+
+    brandReset.addEventListener('click', (e) => {
+      e.preventDefault();
+      setStage(STAGES.INTRO);
+    });
+
+    // Touch gesture swipe on mobile
+    let touchStartY = 0;
+    window.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    window.addEventListener('touchend', (e) => {
+      const deltaY = touchStartY - e.changedTouches[0].clientY;
+      if (currentStage === STAGES.INTRO && deltaY > 30) {
+        setStage(STAGES.INPUT);
+        urlInput.focus();
+      }
+    }, { passive: true });
+
+    // 2. Desktop Cursor Parallax
+    const cursorRing = document.getElementById('cursorRing');
+    const cursorDot = document.getElementById('cursorDot');
+    window.addEventListener('mousemove', (e) => {
+      cursorRing.style.left = `${e.clientX}px`;
+      cursorRing.style.top = `${e.clientY}px`;
+      cursorDot.style.left = `${e.clientX}px`;
+      cursorDot.style.top = `${e.clientY}px`;
+
+      // Subtle ambient shift
+      const moveX = (e.clientX - window.innerWidth / 2) * 0.05;
+      const moveY = (e.clientY - window.innerHeight / 2) * 0.05;
+      ambientRadial.style.transform = `translate(${moveX}px, ${moveY}px)`;
+    });
+
+    // 3. Paste Button Handler
+    btnPaste.addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          urlInput.value = text.trim();
+          executeInspection();
+        }
+      } catch {
+        urlInput.focus();
+      }
+    });
+
+    btnInspect.addEventListener('click', executeInspection);
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') executeInspection();
+    });
+
+    // 4. URL → Preview Morph Transition
+    async function executeInspection() {
+      const url = urlInput.value.trim();
+      if (!url) return;
+
+      btnInspect.disabled = true;
+      inspectLabel.textContent = "Resolving...";
+
+      try {
+        const res = await fetch(`${API_BASE}/info`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || "Inspection failure");
+
+        // Hydrate Preview
+        metaTitle.textContent = data.title;
+        metaThumb.src = data.thumbnail;
+        metaDuration.textContent = data.duration;
+        metaChannel.textContent = data.channel;
+        metaViews.textContent = `${data.views} views`;
+        document.getElementById('trimEnd').value = data.duration;
+
+        // Advance to Preview/Format State
+        setStage(STAGES.FORMAT);
+        updateChamberText();
+        saveHistory(data.title);
+
+      } catch (err) {
+        alert("Neil Studio Connection: " + err.message);
+      } finally {
+        btnInspect.disabled = false;
+        inspectLabel.textContent = "Inspect";
+      }
+    }
+
+    // 5. Category Decks & Format Selection
+    document.querySelectorAll('.cat-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.deck-content').forEach(d => d.classList.remove('active'));
+
+        tab.classList.add('active');
+        const target = document.getElementById(`deck-${tab.dataset.deck}`);
+        if (target) target.classList.add('active');
+
+        if (tab.dataset.deck === 'trim') {
+          selectedExport = { mode: 'video', format: '1080p', label: 'Trimmed 1080p Clip' };
+        } else {
+          const firstCard = target.querySelector('.deck-card');
+          if (firstCard) firstCard.click();
+        }
+        updateChamberText();
+      });
+    });
+
+    document.querySelectorAll('.deck-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.deck-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+
+        selectedExport = {
+          mode: card.dataset.mode,
+          format: card.dataset.format,
+          label: card.querySelector('.card-name').textContent
+        };
+        updateChamberText();
+      });
+    });
+
+    function updateChamberText() {
+      chamberLabel.textContent = `Download ${selectedExport.label}`;
+    }
+
+    // 6. Action Chamber Execution (Download Engine)
+    actionChamber.addEventListener('click', async () => {
+      if (currentStage === STAGES.SUCCESS && compiledFileBlob) {
+        // Trigger browser save
+        const dlUrl = window.URL.createObjectURL(compiledFileBlob);
+        const a = document.createElement('a');
+        a.href = dlUrl;
+        a.download = compiledFileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(dlUrl);
+        return;
+      }
+
+      if (currentStage !== STAGES.FORMAT && currentStage !== STAGES.PREVIEW) return;
+
+      const url = urlInput.value.trim();
+      setStage(STAGES.DOWNLOAD);
+
+      chamberFill.style.width = '20%';
+      chamberLabel.textContent = "PREPARING STREAMS...";
+
+      const payload = {
+        url: url,
+        mode: selectedExport.mode,
+        format: selectedExport.format,
+        start_time: document.getElementById('trimStart').value,
+        end_time: document.getElementById('trimEnd').value
+      };
+
+      try {
+        const response = await fetch(`${API_BASE}/download`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || "Engine error");
+        }
+
+        chamberFill.style.width = '80%';
+        chamberLabel.textContent = "COMPILING CONTAINER...";
+
+        const blob = await response.blob();
+        compiledFileBlob = blob;
+
+        // Parse filename
+        let ext = selectedExport.mode === 'subtitle' ? selectedExport.format : (selectedExport.mode === 'audio' ? selectedExport.format : 'mp4');
+        compiledFileName = `${metaTitle.textContent.slice(0, 30)}.${ext}`;
+
+        const disposition = response.headers.get('Content-Disposition');
+        if (disposition && disposition.includes('filename=')) {
+          const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+          if (matches != null && matches[1]) compiledFileName = matches[1].replace(/['"]/g, '');
+        }
+
+        // COMPLETE STAGE
+        setStage(STAGES.SUCCESS);
+        chamberFill.style.width = '100%';
+        chamberLabel.textContent = "READY — CLICK TO SAVE";
+
+      } catch (err) {
+        alert("Compilation halted: " + err.message);
+        setStage(STAGES.FORMAT);
+        chamberFill.style.width = '0%';
+        updateChamberText();
+      }
+    });
+
+    // 7. Modals
+    const modalHelp = document.getElementById('modalHelp');
+    const modalHistory = document.getElementById('modalHistory');
+
+    document.getElementById('btnHelp').addEventListener('click', () => modalHelp.classList.add('active'));
+    document.getElementById('btnCloseHelp').addEventListener('click', () => modalHelp.classList.remove('active'));
+
+    document.getElementById('btnHistory').addEventListener('click', () => modalHistory.classList.add('active'));
+    document.getElementById('btnCloseHistory').addEventListener('click', () => modalHistory.classList.remove('active'));
+
+    function saveHistory(title) {
+      let h = JSON.parse(localStorage.getItem('neil_history') || '[]');
+      h.unshift({ title, time: new Date().toLocaleTimeString() });
+      localStorage.setItem('neil_history', JSON.stringify(h.slice(0, 5)));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('historyEntries');
+      const h = JSON.parse(localStorage.getItem('neil_history') || '[]');
+      if (h.length === 0) return;
+      container.innerHTML = h.map(item => `
+        <div style="padding: 10px 0; border-bottom: 1px solid var(--border-thin);">
+          <div style="font-weight: 600; color: var(--text-main);">${item.title}</div>
+          <div style="font-size: 0.72rem; color: var(--text-dim);">${item.time}</div>
+        </div>
+      `).join('');
+    }
+    renderHistory();
+  </script>
+</body>
+</html>

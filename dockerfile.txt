@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+# Install system dependencies including FFmpeg
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python packages
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy project files
+COPY . .
+
+# Use environment PORT or default to 5000, with a 5-minute timeout for large videos
+ENV PORT=5000
+EXPOSE 5000
+
+CMD ["sh", "-c", "gunicorn -w 2 -b 0.0.0.0:$PORT --timeout 300 server:app"]
