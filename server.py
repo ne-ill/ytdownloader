@@ -11,11 +11,26 @@ CORS(app)
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
+# -------------------------------------------------------------
+# Cookie Detection (File or Environment Variable)
+# -------------------------------------------------------------
+COOKIE_PATH = None
+if os.path.exists("cookies.txt"):
+    COOKIE_PATH = "cookies.txt"
+elif "YOUTUBE_COOKIES" in os.environ:
+    # Allows pasting cookie content directly into Render Environment Variables
+    COOKIE_PATH = "render_cookies.txt"
+    with open(COOKIE_PATH, "w", encoding="utf-8") as f:
+        f.write(os.environ["YOUTUBE_COOKIES"])
+
+
 def sanitize_filename(name):
+    """Sanitizes file name for all operating systems."""
     return re.sub(r'[\\/*?:"<>|]', "", name)
 
+
 def parse_seconds(t_str):
-    """Converts hh:mm:ss or mm:ss or seconds string to float."""
+    """Parses hh:mm:ss, mm:ss, or integer seconds."""
     if not t_str:
         return None
     parts = str(t_str).strip().split(":")
@@ -30,6 +45,30 @@ def parse_seconds(t_str):
         return None
     return None
 
+
+def get_base_ydl_opts(extra_opts=None):
+    """Generates base yt-dlp configuration with bot bypasses."""
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web", "ios"]
+            }
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+    }
+    if COOKIE_PATH and os.path.exists(COOKIE_PATH):
+        opts["cookiefile"] = COOKIE_PATH
+
+    if extra_opts:
+        opts.update(extra_opts)
+    return opts
+
+
 # -------------------------------------------------------------
 # 1. Homepage Route
 # -------------------------------------------------------------
@@ -39,8 +78,9 @@ def home():
         return send_file("index.html")
     return "Error: index.html not found.", 404
 
+
 # -------------------------------------------------------------
-# 2. Inspect Video Details
+# 2. Inspect Video Details (API)
 # -------------------------------------------------------------
 @app.route("/api/info", methods=["POST"])
 def get_video_info():
@@ -50,27 +90,17 @@ def get_video_info():
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "web"]
-            }
-        }
-    }
+    ydl_opts = get_base_ydl_opts({"skip_download": True})
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            
+
             duration_secs = info.get("duration", 0)
             mins = duration_secs // 60
             secs = duration_secs % 60
             formatted_duration = f"{mins}:{secs:02d}"
 
-            # Best available thumbnail
             thumbnail = info.get("thumbnail", "")
             if info.get("thumbnails"):
                 thumbnail = info["thumbnails"][-1].get("url", thumbnail)
@@ -87,22 +117,23 @@ def get_video_info():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 # -------------------------------------------------------------
-# 3. Comprehensive Download API
+# 3. Download & Export Media (API)
 # -------------------------------------------------------------
 @app.route("/api/download", methods=["POST"])
 def download_media():
     data = request.get_json() or {}
     url = data.get("url", "").strip()
-    mode = data.get("mode", "video")         # 'video', 'audio', 'subtitle', 'thumbnail'
-    format_choice = data.get("format", "1080p") 
+    mode = data.get("mode", "video")         # 'video', 'audio', 'subtitle'
+    format_choice = data.get("format", "1080p")
     start_time = data.get("start_time")
     end_time = data.get("end_time")
 
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
-    # Clean old files in download directory
+    # Clean old temp files
     for f in os.listdir(DOWNLOAD_FOLDER):
         fp = os.path.join(DOWNLOAD_FOLDER, f)
         try:
@@ -112,19 +143,9 @@ def download_media():
             pass
 
     out_template = os.path.join(DOWNLOAD_FOLDER, "%(title)s.%(ext)s")
+    ydl_opts = get_base_ydl_opts({"outtmpl": out_template})
 
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "outtmpl": out_template,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "web"]
-            }
-        }
-    }
-
-    # Add range cutting if trimmer was specified
+    # Optional Time Range Trimmer
     s_sec = parse_seconds(start_time)
     e_sec = parse_seconds(end_time)
     if s_sec is not None and e_sec is not None and e_sec > s_sec:
@@ -133,7 +154,7 @@ def download_media():
 
     # 1. Mode: Subtitles / Transcripts
     if mode == "subtitle":
-        sub_type = format_choice.lower() # 'srt' or 'txt'
+        sub_type = format_choice.lower()
         ydl_opts.update({
             "skip_download": True,
             "writesubtitles": True,
@@ -145,33 +166,31 @@ def download_media():
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 title = sanitize_filename(info.get("title", "transcript"))
-                
-                # Locate generated subtitle file
+
                 sub_files = glob.glob(os.path.join(DOWNLOAD_FOLDER, "*.srt")) + glob.glob(os.path.join(DOWNLOAD_FOLDER, "*.vtt"))
                 if not sub_files:
-                    return jsonify({"error": "No subtitles or transcript found for this video."}), 404
-                
+                    return jsonify({"error": "No subtitles found for this video."}), 404
+
                 target_sub = sub_files[0]
 
-                # Convert to clean TXT if requested
                 if sub_type == "txt":
                     with open(target_sub, "r", encoding="utf-8", errors="ignore") as sf:
                         raw = sf.read()
-                    # Strip timestamps and index numbers
+                    # Strip timecodes and tags
                     clean_text = re.sub(r'\d+\n\d\d:\d\d:.*?\n', '', raw)
                     clean_text = re.sub(r'<[^>]+>', '', clean_text)
                     txt_path = os.path.join(DOWNLOAD_FOLDER, f"{title}.txt")
                     with open(txt_path, "w", encoding="utf-8") as tf:
                         tf.write(clean_text.strip())
                     return send_file(txt_path, as_attachment=True, download_name=f"{title}.txt")
-                
+
                 return send_file(target_sub, as_attachment=True, download_name=f"{title}.srt")
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
     # 2. Mode: Studio Audio
     elif mode == "audio":
-        codec = format_choice.lower() # mp3, wav, flac, m4a
+        codec = format_choice.lower()
         postproc = {
             "key": "FFmpegExtractAudio",
             "preferredcodec": codec if codec != "m4a" else "m4a",
@@ -203,7 +222,6 @@ def download_media():
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-            # Determine resulting extension
             if mode == "audio":
                 ext = format_choice.lower()
                 filename = os.path.splitext(filename)[0] + f".{ext}"
@@ -222,10 +240,17 @@ def download_media():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# -------------------------------------------------------------
+# Server Launcher (Local or Render Port)
+# -------------------------------------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    print(f"\n=======================================================")
+    print(f" NEIL STUDIO is LIVE on port {port}")
+    if COOKIE_PATH:
+        print(f" Cookie Authentication: ACTIVE ({COOKIE_PATH})")
+    else:
+        print(" Cookie Authentication: NONE (Add cookies.txt to avoid bot check)")
+    print(f"=======================================================\n")
     app.run(host="0.0.0.0", port=port, debug=False)
-    print("\n=======================================================")
-    print(" DOWNLY Studio Server running on: http://127.0.0.1:5000")
-    print("=======================================================\n")
-    app.run(host="127.0.0.1", port=5000, debug=True)
