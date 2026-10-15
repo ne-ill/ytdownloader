@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# Sensitive authentication cookies (DO NOT COMMIT!)
+cookies.txt
+render_cookies.txt
+*.cookie
+*.cookies
+
+# Media downloads folder
+downloads/*
+!downloads/.gitkeep
