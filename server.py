@@ -1,7 +1,6 @@
 import os
 import re
 import glob
-import shutil
 import yt_dlp
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -13,31 +12,37 @@ DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 # -------------------------------------------------------------
-# Cookie Detection (File or Environment Variable)
+# Cookie Detection (Checks Render Secret Files + Local Paths)
 # -------------------------------------------------------------
-def get_cookie_file():
-    """Detects and returns a valid cookie file path, or None."""
-    local_cookie = "cookies.txt"
-    if os.path.isfile(local_cookie) and os.path.getsize(local_cookie) > 0:
-        return local_cookie
+POSSIBLE_COOKIE_PATHS = [
+    "/etc/secrets/cookies.txt",                      # Render Secret File path
+    "cookies.txt",                                   # Local folder path
+    os.path.join(os.getcwd(), "cookies.txt"),
+    os.path.join(os.getcwd(), "downloads", "cookies.txt"),
+]
 
-    cookie_env = os.environ.get("YOUTUBE_COOKIES", "").strip()
-    if cookie_env:
-        render_cookie = "render_cookies.txt"
-        with open(render_cookie, "w", encoding="utf-8") as f:
-            f.write(cookie_env)
-        return render_cookie
+COOKIE_PATH = None
+for path in POSSIBLE_COOKIE_PATHS:
+    if os.path.exists(path) and os.path.getsize(path) > 0:
+        COOKIE_PATH = path
+        break
 
-    return None
+# Fallback: Environment variable string if set in Render
+if not COOKIE_PATH and "YOUTUBE_COOKIES" in os.environ:
+    COOKIE_PATH = "/tmp/render_cookies.txt"
+    with open(COOKIE_PATH, "w", encoding="utf-8") as f:
+        f.write(os.environ["YOUTUBE_COOKIES"])
+
+print(f"\n[NEIL STUDIO AUTH] Cookie status: {'LOADED from ' + COOKIE_PATH if COOKIE_PATH else 'NOT FOUND'}\n")
 
 
 def sanitize_filename(name):
-    """Sanitizes file name for all operating systems."""
+    """Sanitizes file names across OS boundaries."""
     return re.sub(r'[\\/*?:"<>|]', "", name)
 
 
 def parse_seconds(t_str):
-    """Parses hh:mm:ss, mm:ss, or integer seconds."""
+    """Parses hh:mm:ss, mm:ss, or numeric seconds."""
     if not t_str:
         return None
     parts = str(t_str).strip().split(":")
@@ -53,35 +58,25 @@ def parse_seconds(t_str):
     return None
 
 
-def format_error(e):
-    """Provides user-friendly error messages for common yt-dlp issues."""
-    msg = str(e)
-    if "Sign in to confirm you’re not a bot" in msg or "Sign in to confirm you're not a bot" in msg:
-        return (
-            "YouTube Bot Check: YouTube requires authentication. "
-            "Please export cookies.txt from your browser into the yt folder "
-            "(or set YOUTUBE_COOKIES env variable on Render)."
-        )
-    return msg
-
-
 def get_base_ydl_opts(extra_opts=None):
-    """Generates base yt-dlp configuration with bot bypasses and format solvers."""
+    """Generates base yt-dlp config with iOS client bot bypass."""
     opts = {
         "quiet": True,
         "no_warnings": True,
-        "remote_components": ["ejs:github"],
+        "extractor_args": {
+            "youtube": {
+                # 'ios' bypasses YouTube's datacenter IP bot-verification checks
+                "player_client": ["ios", "android", "mweb"]
+            }
+        },
         "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
             "Accept-Language": "en-US,en;q=0.9",
         }
     }
-    if shutil.which("node"):
-        opts["js_runtimes"] = {"node": {}}
 
-    cookie_path = get_cookie_file()
-    if cookie_path:
-        opts["cookiefile"] = cookie_path
+    if COOKIE_PATH and os.path.exists(COOKIE_PATH):
+        opts["cookiefile"] = COOKIE_PATH
 
     if extra_opts:
         opts.update(extra_opts)
@@ -95,7 +90,7 @@ def get_base_ydl_opts(extra_opts=None):
 def home():
     if os.path.exists("index.html"):
         return send_file("index.html")
-    return "Error: index.html not found.", 404
+    return "Error: index.html not found in project root.", 404
 
 
 # -------------------------------------------------------------
@@ -134,7 +129,7 @@ def get_video_info():
                 "views": f"{info.get('view_count', 0):,}"
             })
     except Exception as e:
-        return jsonify({"error": format_error(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 # -------------------------------------------------------------
@@ -152,7 +147,7 @@ def download_media():
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
-    # Clean old temp files
+    # Clean old temporary files
     for f in os.listdir(DOWNLOAD_FOLDER):
         fp = os.path.join(DOWNLOAD_FOLDER, f)
         try:
@@ -195,7 +190,6 @@ def download_media():
                 if sub_type == "txt":
                     with open(target_sub, "r", encoding="utf-8", errors="ignore") as sf:
                         raw = sf.read()
-                    # Strip timecodes and tags
                     clean_text = re.sub(r'\d+\n\d\d:\d\d:.*?\n', '', raw)
                     clean_text = re.sub(r'<[^>]+>', '', clean_text)
                     txt_path = os.path.join(DOWNLOAD_FOLDER, f"{title}.txt")
@@ -205,7 +199,7 @@ def download_media():
 
                 return send_file(target_sub, as_attachment=True, download_name=f"{title}.srt")
         except Exception as e:
-            return jsonify({"error": format_error(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
     # 2. Mode: Studio Audio
     elif mode == "audio":
@@ -232,7 +226,7 @@ def download_media():
         }
         res_limit = res_map.get(format_choice.lower(), "1080")
         ydl_opts.update({
-            "format": f"bestvideo[height<={res_limit}]+bestaudio/best[height<={res_limit}]/bestvideo+bestaudio/best",
+            "format": f"bestvideo[height<={res_limit}]+bestaudio/best[height<={res_limit}]/best",
             "merge_output_format": "mp4"
         })
 
@@ -257,33 +251,19 @@ def download_media():
                 download_name=download_name
             )
     except Exception as e:
-        return jsonify({"error": format_error(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 # -------------------------------------------------------------
-# 4. Status Check (API)
-# -------------------------------------------------------------
-@app.route("/api/status", methods=["GET"])
-def server_status():
-    cookie_file = get_cookie_file()
-    return jsonify({
-        "status": "online",
-        "cookies_active": cookie_file is not None,
-        "cookie_file": cookie_file
-    })
-
-
-# -------------------------------------------------------------
-# Server Launcher (Local or Render Port)
+# Server Launcher (Handles Local + Render PORT)
 # -------------------------------------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    active_cookie = get_cookie_file()
     print(f"\n=======================================================")
     print(f" NEIL STUDIO is LIVE on port {port}")
-    if active_cookie:
-        print(f" Cookie Authentication: ACTIVE ({active_cookie})")
+    if COOKIE_PATH:
+        print(f" Cookie Authentication: ACTIVE ({COOKIE_PATH})")
     else:
-        print(" Cookie Authentication: NONE (Running without cookies. Place cookies.txt to activate)")
+        print(" Cookie Authentication: NONE (Running in guest mode)")
     print(f"=======================================================\n")
     app.run(host="0.0.0.0", port=port, debug=False)
