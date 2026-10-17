@@ -1,6 +1,7 @@
 import os
 import re
 import glob
+import shutil
 import yt_dlp
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -12,7 +13,7 @@ DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 # -------------------------------------------------------------
-# Cookie Detection (Checks Render Secret Files + Local Paths)
+# Cookie Detection & Read-Only Workaround for Render
 # -------------------------------------------------------------
 POSSIBLE_COOKIE_PATHS = [
     "/etc/secrets/cookies.txt",                      # Render Secret File path
@@ -24,7 +25,15 @@ POSSIBLE_COOKIE_PATHS = [
 COOKIE_PATH = None
 for path in POSSIBLE_COOKIE_PATHS:
     if os.path.exists(path) and os.path.getsize(path) > 0:
-        COOKIE_PATH = path
+        # Render mounts /etc/secrets as read-only.
+        # Copy to /tmp/cookies.txt so yt-dlp has write permissions.
+        writable_path = "/tmp/cookies.txt" if os.name != "nt" else os.path.join(DOWNLOAD_FOLDER, "active_cookies.txt")
+        try:
+            shutil.copyfile(path, writable_path)
+            COOKIE_PATH = writable_path
+        except Exception as e:
+            print(f"[NEIL STUDIO] Cookie copy fallback: {e}")
+            COOKIE_PATH = path
         break
 
 # Fallback: Environment variable string if set in Render
@@ -33,7 +42,7 @@ if not COOKIE_PATH and "YOUTUBE_COOKIES" in os.environ:
     with open(COOKIE_PATH, "w", encoding="utf-8") as f:
         f.write(os.environ["YOUTUBE_COOKIES"])
 
-print(f"\n[NEIL STUDIO AUTH] Cookie status: {'LOADED from ' + COOKIE_PATH if COOKIE_PATH else 'NOT FOUND'}\n")
+print(f"\n[NEIL STUDIO AUTH] Cookie status: {'LOADED (Writable copy at ' + COOKIE_PATH + ')' if COOKIE_PATH else 'NOT FOUND'}\n")
 
 
 def sanitize_filename(name):
@@ -65,7 +74,6 @@ def get_base_ydl_opts(extra_opts=None):
         "no_warnings": True,
         "extractor_args": {
             "youtube": {
-                # 'ios' bypasses YouTube's datacenter IP bot-verification checks
                 "player_client": ["ios", "android", "mweb"]
             }
         },
@@ -255,7 +263,7 @@ def download_media():
 
 
 # -------------------------------------------------------------
-# Server Launcher (Handles Local + Render PORT)
+# Server Launcher (Local or Render Port)
 # -------------------------------------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
