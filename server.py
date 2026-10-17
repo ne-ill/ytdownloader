@@ -68,15 +68,13 @@ def parse_seconds(t_str):
 
 
 def get_base_ydl_opts(extra_opts=None):
-    """Bypasses datacenter IP blocks using TV and Creator Studio client tokens."""
+    """Generates base yt-dlp config with proxy and bot bypasses."""
     opts = {
         "quiet": True,
         "no_warnings": True,
         "extractor_args": {
             "youtube": {
-                # These clients bypass standard browser bot verification on datacenter IPs
-                "player_client": ["web_creator", "android_vr", "tv_downgraded"],
-                "player_skip": ["webpage", "configs"]
+                "player_client": ["android", "web", "ios"]
             }
         },
         "http_headers": {
@@ -85,6 +83,12 @@ def get_base_ydl_opts(extra_opts=None):
         }
     }
 
+    # Reads the proxy from Render Environment
+    proxy_url = os.environ.get("PROXY_URL")
+    if proxy_url:
+        opts["proxy"] = proxy_url.strip()
+
+    # Cookie file fallback
     if COOKIE_PATH and os.path.exists(COOKIE_PATH):
         opts["cookiefile"] = COOKIE_PATH
 
